@@ -7,16 +7,22 @@ class BloomColors {
   BloomColors._();
 
   // ---- Reference Color Palette ----
-  static const Color heroPeach = Color(0xFFFBE7CF);      // Warm apricot/peach hero background
-  static const Color bg = Color(0xFFFFFCF8);             // Clean warm canvas
-  static const Color surface = Color(0xFFFFFFFF);        // Clean white content surface
-  static const Color surface2 = Color(0xFFF8F5F0);       // Soft neutral secondary surface
-  static const Color primaryViolet = Color(0xFF7560D5);  // Violet primary buttons, selected tabs, links, active icons
-  static const Color paleLavender = Color(0xFFECE7FA);   // Pale lavender selected-state backgrounds
-  static const Color powderBlue = Color(0xFFE5F0FF);     // Powder blue featured activity panels
-  static const Color ink = Color(0xFF292929);            // Charcoal headings & main text
-  static const Color inkSoft = Color(0xFF757575);        // Readable muted-gray secondary text
-  static const Color line = Color(0xFFEBE6DF);           // Subtle neutral border
+  static const Color heroPeach =
+      Color(0xFFFBE7CF); // Warm apricot/peach hero background
+  static const Color bg = Color(0xFFFFFCF8); // Clean warm canvas
+  static const Color surface = Color(0xFFFFFFFF); // Clean white content surface
+  static const Color surface2 =
+      Color(0xFFF8F5F0); // Soft neutral secondary surface
+  static const Color primaryViolet = Color(
+      0xFF7560D5); // Violet primary buttons, selected tabs, links, active icons
+  static const Color paleLavender =
+      Color(0xFFECE7FA); // Pale lavender selected-state backgrounds
+  static const Color powderBlue =
+      Color(0xFFE5F0FF); // Powder blue featured activity panels
+  static const Color ink = Color(0xFF292929); // Charcoal headings & main text
+  static const Color inkSoft =
+      Color(0xFF757575); // Readable muted-gray secondary text
+  static const Color line = Color(0xFFEBE6DF); // Subtle neutral border
 
   // Supporting category accents (used with restraint, not rainbow tiles)
   static const Color mint = Color(0xFFE2F4E9);
@@ -88,7 +94,8 @@ class BloomShadows {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return [
       BoxShadow(
-        color: (dark ? Colors.black : const Color(0xFF2C251C)).withOpacity(dark ? 0.22 : 0.04),
+        color: (dark ? Colors.black : const Color(0xFF2C251C))
+            .withOpacity(dark ? 0.22 : 0.04),
         blurRadius: 14,
         offset: const Offset(0, 3),
       ),
@@ -99,7 +106,8 @@ class BloomShadows {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return [
       BoxShadow(
-        color: (dark ? Colors.black : const Color(0xFF2C251C)).withOpacity(dark ? 0.32 : 0.07),
+        color: (dark ? Colors.black : const Color(0xFF2C251C))
+            .withOpacity(dark ? 0.32 : 0.07),
         blurRadius: 20,
         offset: const Offset(0, 6),
       ),
@@ -149,19 +157,70 @@ class BloomTheme {
     final ink = dark ? BloomColors.inkD : BloomColors.ink;
     final inkSoft = dark ? BloomColors.inkSoftD : BloomColors.inkSoft;
     final textTheme = TextTheme(
-      displaySmall: TextStyle(fontSize: 30, fontWeight: FontWeight.w700, color: ink, height: 1.15, fontFamily: _fontFamily),
-      headlineSmall: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: ink, height: 1.2, fontFamily: _fontFamily),
-      titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: ink, fontFamily: _fontFamily),
-      titleMedium: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: ink, fontFamily: _fontFamily),
-      titleSmall: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: ink, fontFamily: _fontFamily),
-      bodyLarge: TextStyle(fontSize: 17, fontWeight: FontWeight.w400, color: ink, height: 1.45, fontFamily: _fontFamily),
-      bodyMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w400, color: ink, height: 1.45, fontFamily: _fontFamily),
-      bodySmall: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w400, color: inkSoft, height: 1.4, fontFamily: _fontFamily),
-      labelLarge: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: ink, fontFamily: _fontFamily),
-      labelMedium: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: inkSoft, fontFamily: _fontFamily),
+      displaySmall: TextStyle(
+          fontSize: 30,
+          fontWeight: FontWeight.w700,
+          color: ink,
+          height: 1.15,
+          fontFamily: _fontFamily),
+      headlineSmall: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.w700,
+          color: ink,
+          height: 1.2,
+          fontFamily: _fontFamily),
+      titleLarge: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          color: ink,
+          fontFamily: _fontFamily),
+      titleMedium: TextStyle(
+          fontSize: 17,
+          fontWeight: FontWeight.w600,
+          color: ink,
+          fontFamily: _fontFamily),
+      titleSmall: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: ink,
+          fontFamily: _fontFamily),
+      bodyLarge: TextStyle(
+          fontSize: 17,
+          fontWeight: FontWeight.w400,
+          color: ink,
+          height: 1.45,
+          fontFamily: _fontFamily),
+      bodyMedium: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w400,
+          color: ink,
+          height: 1.45,
+          fontFamily: _fontFamily),
+      bodySmall: TextStyle(
+          fontSize: 13.5,
+          fontWeight: FontWeight.w400,
+          color: inkSoft,
+          height: 1.4,
+          fontFamily: _fontFamily),
+      labelLarge: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: ink,
+          fontFamily: _fontFamily),
+      labelSmall: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: inkSoft,
+          fontFamily: _fontFamily),
+      labelMedium: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: inkSoft,
+          fontFamily: _fontFamily),
     );
     return ThemeData(
       useMaterial3: true,
+      fontFamily: _fontFamily,
       brightness: brightness,
       colorScheme: scheme,
       scaffoldBackgroundColor: dark ? BloomColors.bgD : BloomColors.bg,
@@ -174,11 +233,12 @@ class BloomTheme {
         titleTextStyle: textTheme.titleLarge,
         iconTheme: IconThemeData(color: ink),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: scheme.surface,
         elevation: 0,
         margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BloomRadii.card)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(BloomRadii.card)),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
@@ -192,13 +252,19 @@ class BloomTheme {
           shape: const StadiumBorder(),
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
           side: BorderSide(color: scheme.outline),
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          textStyle: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              fontFamily: _fontFamily),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           shape: const StadiumBorder(),
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          textStyle: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              fontFamily: _fontFamily),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -216,12 +282,18 @@ class BloomTheme {
           borderRadius: BorderRadius.circular(BloomRadii.bubble),
           borderSide: BorderSide(color: scheme.primary, width: 1.6),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
         hintStyle: TextStyle(color: inkSoft),
       ),
       chipTheme: ChipThemeData(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BloomRadii.chip)),
-        labelStyle: TextStyle(color: ink, fontSize: 13.5, fontWeight: FontWeight.w600),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(BloomRadii.chip)),
+        labelStyle: TextStyle(
+            color: ink,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
+            fontFamily: _fontFamily),
         backgroundColor: dark ? BloomColors.surface2D : BloomColors.surface2,
         selectedColor: scheme.primary.withOpacity(0.18),
         side: BorderSide.none,
@@ -230,27 +302,32 @@ class BloomTheme {
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: scheme.surface,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(BloomRadii.sheet)),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(BloomRadii.sheet)),
         ),
         showDragHandle: true,
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: scheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BloomRadii.card)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(BloomRadii.card)),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BloomRadii.bubble)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(BloomRadii.bubble)),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: dark ? BloomColors.surfaceD : BloomColors.surface,
-        indicatorColor: dark ? BloomColors.paleLavenderD : BloomColors.paleLavender,
+        indicatorColor:
+            dark ? BloomColors.paleLavenderD : BloomColors.paleLavender,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return TextStyle(
               fontSize: 11.5,
               fontWeight: FontWeight.w700,
-              color: dark ? BloomColors.primaryVioletD : BloomColors.primaryViolet,
+              color:
+                  dark ? BloomColors.primaryVioletD : BloomColors.primaryViolet,
             );
           }
           return TextStyle(
@@ -262,16 +339,19 @@ class BloomTheme {
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return IconThemeData(
-              color: dark ? BloomColors.primaryVioletD : BloomColors.primaryViolet,
+              color:
+                  dark ? BloomColors.primaryVioletD : BloomColors.primaryViolet,
               size: 24,
             );
           }
           return IconThemeData(color: inkSoft, size: 22);
         }),
       ),
-      dividerTheme: DividerThemeData(color: scheme.outline, thickness: 1, space: 1),
+      dividerTheme:
+          DividerThemeData(color: scheme.outline, thickness: 1, space: 1),
       listTileTheme: ListTileThemeData(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(BloomRadii.bubble)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(BloomRadii.bubble)),
       ),
     );
   }

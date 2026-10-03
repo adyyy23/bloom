@@ -4,14 +4,7 @@ import 'dart:math' as math;
 enum BodyFrame { narrow, medium, broad }
 
 /// Inclusive skin tone palette.
-enum SkinTone {
-  fair,
-  warmSand,
-  honey,
-  goldenAmber,
-  deepBronze,
-  richEspresso,
-}
+enum SkinTone { fair, warmSand, honey, goldenAmber, deepBronze, richEspresso }
 
 /// Hairstyle presets.
 enum HairStyle { shortCrop, athleticBun, softCurls, waves }
@@ -26,10 +19,13 @@ enum ClothingColor { sage, lavender, ocean, coral, slate }
 enum FacePreset { natural, soft, defined, angular }
 
 /// Clothing style presets.
+enum AvatarAccessory { none, headband, glasses }
+
 enum ClothingStyle { twoPieceAthletic, fullBodyFit, relaxedSet }
 
 /// Avatar personalization configuration.
 class AvatarConfig {
+  final AvatarAccessory accessory;
   final BodyFrame frame;
   final SkinTone skinTone;
   final HairStyle hairStyle;
@@ -42,11 +38,12 @@ class AvatarConfig {
   final double? chestCm;
 
   const AvatarConfig({
+    this.accessory = AvatarAccessory.none,
     this.frame = BodyFrame.medium,
     this.skinTone = SkinTone.warmSand,
     this.hairStyle = HairStyle.athleticBun,
     this.hairColor = HairColor.espresso,
-    this.clothingColor = ClothingColor.sage,
+    this.clothingColor = ClothingColor.lavender,
     this.facePreset = FacePreset.natural,
     this.clothingStyle = ClothingStyle.twoPieceAthletic,
     this.waistCm,
@@ -55,6 +52,7 @@ class AvatarConfig {
   });
 
   AvatarConfig copyWith({
+    AvatarAccessory? accessory,
     BodyFrame? frame,
     SkinTone? skinTone,
     HairStyle? hairStyle,
@@ -66,6 +64,7 @@ class AvatarConfig {
     double? hipCm,
     double? chestCm,
   }) => AvatarConfig(
+    accessory: accessory ?? this.accessory,
     frame: frame ?? this.frame,
     skinTone: skinTone ?? this.skinTone,
     hairStyle: hairStyle ?? this.hairStyle,
@@ -79,6 +78,7 @@ class AvatarConfig {
   );
 
   Map<String, dynamic> toJson() => {
+    'accessory': accessory.name,
     'frame': frame.name,
     'skinTone': skinTone.name,
     'hairStyle': hairStyle.name,
@@ -92,13 +92,38 @@ class AvatarConfig {
   };
 
   factory AvatarConfig.fromJson(Map<String, dynamic> j) => AvatarConfig(
-    frame: BodyFrame.values.firstWhere((e) => e.name == j['frame'], orElse: () => BodyFrame.medium),
-    skinTone: SkinTone.values.firstWhere((e) => e.name == j['skinTone'], orElse: () => SkinTone.warmSand),
-    hairStyle: HairStyle.values.firstWhere((e) => e.name == j['hairStyle'], orElse: () => HairStyle.athleticBun),
-    hairColor: HairColor.values.firstWhere((e) => e.name == j['hairColor'], orElse: () => HairColor.espresso),
-    clothingColor: ClothingColor.values.firstWhere((e) => e.name == j['clothingColor'], orElse: () => ClothingColor.sage),
-    facePreset: FacePreset.values.firstWhere((e) => e.name == j['facePreset'], orElse: () => FacePreset.natural),
-    clothingStyle: ClothingStyle.values.firstWhere((e) => e.name == j['clothingStyle'], orElse: () => ClothingStyle.twoPieceAthletic),
+    accessory: AvatarAccessory.values.firstWhere(
+      (e) => e.name == j['accessory'],
+      orElse: () => AvatarAccessory.none,
+    ),
+    frame: BodyFrame.values.firstWhere(
+      (e) => e.name == j['frame'],
+      orElse: () => BodyFrame.medium,
+    ),
+    skinTone: SkinTone.values.firstWhere(
+      (e) => e.name == j['skinTone'],
+      orElse: () => SkinTone.warmSand,
+    ),
+    hairStyle: HairStyle.values.firstWhere(
+      (e) => e.name == j['hairStyle'],
+      orElse: () => HairStyle.athleticBun,
+    ),
+    hairColor: HairColor.values.firstWhere(
+      (e) => e.name == j['hairColor'],
+      orElse: () => HairColor.espresso,
+    ),
+    clothingColor: ClothingColor.values.firstWhere(
+      (e) => e.name == j['clothingColor'],
+      orElse: () => ClothingColor.sage,
+    ),
+    facePreset: FacePreset.values.firstWhere(
+      (e) => e.name == j['facePreset'],
+      orElse: () => FacePreset.natural,
+    ),
+    clothingStyle: ClothingStyle.values.firstWhere(
+      (e) => e.name == j['clothingStyle'],
+      orElse: () => ClothingStyle.twoPieceAthletic,
+    ),
     waistCm: (j['waistCm'] as num?)?.toDouble(),
     hipCm: (j['hipCm'] as num?)?.toDouble(),
     chestCm: (j['chestCm'] as num?)?.toDouble(),

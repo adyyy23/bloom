@@ -1,563 +1,416 @@
+import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+
 import '../core/theme.dart';
 import 'human_body_mesh.dart';
+import 'sculpted_human.dart';
 
-/// Interactive 3D Human Body Visualizer.
-///
-/// Features:
-/// - Real 3D polygon mesh with perspective projection.
-/// - Full-body human avatar with natural anatomical proportions.
-/// - Morph targets parameterized by height, weight, waist, hip, chest, and frame.
-/// - Conformal athletic wear that stays fitted during all morph changes.
-/// - Horizontal drag rotation with damping, Front/3-Quarter/Side/Back presets, and Reset.
-/// - Multi-source studio lighting (Key, Fill, Rim, Ambient) with soft contact shadow.
-/// - Subtle idle breathing animation with reduced-motion support.
-/// - Pauses rendering when scrolled offscreen.
+/// Offline perspective renderer of actual 3D vertices, with smooth vertex lighting.
+/// No image fallback: loading failures present a retry action.
 class HumanVisualizer extends StatefulWidget {
-  final double heightCm;
-  final double weightKg;
+  final double heightCm, weightKg, stageHeight;
   final double? goalWeightKg;
   final AvatarConfig config;
-  final bool isFemale;
-  final bool isGoalPreview;
-  final bool reducedMotion;
+  final bool isFemale, isGoalPreview, reducedMotion;
   final VoidCallback? onEditMeasurements;
   final ValueChanged<bool>? onPreviewModeChanged;
-  final double stageHeight;
-
   const HumanVisualizer({
     super.key,
     required this.heightCm,
     required this.weightKg,
-    this.goalWeightKg,
     required this.config,
+    this.goalWeightKg,
+    this.stageHeight = 360,
     this.isFemale = true,
     this.isGoalPreview = false,
     this.reducedMotion = false,
     this.onEditMeasurements,
     this.onPreviewModeChanged,
-    this.stageHeight = 380,
   });
-
   @override
   State<HumanVisualizer> createState() => _HumanVisualizerState();
 }
 
 class _HumanVisualizerState extends State<HumanVisualizer>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _anim;
-  double _yaw = 0.0; // in radians
-  double _targetYaw = 0.0;
-  bool _isDragging = false;
-  bool _hasError = false;
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  late final AnimationController _animation;
+  Timer? _visibility;
+  HumanGeometry? _geometry;
+  SculptedHuman? _model;
+  bool _failed = false, _visible = true, _foreground = true;
+  double _yaw = -.18;
+  int _lastFrame = 0;
 
   @override
   void initState() {
     super.initState();
-    _anim = AnimationController(
+    WidgetsBinding.instance.addObserver(this);
+    _animation = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 4000),
-    )..addListener(() {
-        if (!widget.reducedMotion) {
-          // Smooth yaw interpolation towards target preset when not dragging
-          if (!_isDragging && (_yaw - _targetYaw).abs() > 0.001) {
-            _yaw += (_targetYaw - _yaw) * 0.18;
-          }
-          setState(() {});
-        }
-      });
+      duration: const Duration(seconds: 5),
+    );
+    _animation.addListener(() {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (now - _lastFrame >= 33) {
+        _lastFrame = now;
+        setState(() {});
+      }
+    });
+    _load();
+    _visibility = Timer.periodic(
+      const Duration(milliseconds: 300),
+      (_) => _checkVisibility(),
+    );
+  }
 
-    if (!widget.reducedMotion) {
-      _anim.repeat();
+  Future<void> _load({bool retry = false}) async {
+    setState(() {
+      _failed = false;
+      _geometry = null;
+    });
+    try {
+      final model = await SculptedHuman.load(retry: retry);
+      final geometry = model.geometry(widget.config);
+      if (!mounted) return;
+      setState(() {
+        _model = model;
+        _geometry = geometry;
+      });
+      _syncAnimation();
+    } catch (_) {
+      if (mounted) setState(() => _failed = true);
     }
   }
 
+  void _syncAnimation() {
+    final enabled = mounted &&
+        _geometry != null &&
+        _visible &&
+        _foreground &&
+        !widget.reducedMotion &&
+        !MediaQuery.disableAnimationsOf(context) &&
+        TickerMode.of(context);
+    if (enabled && !_animation.isAnimating) _animation.repeat();
+    if (!enabled && _animation.isAnimating) _animation.stop();
+  }
+
+  void _checkVisibility() {
+    if (!mounted) return;
+    final box = context.findRenderObject();
+    if (box is RenderBox && box.hasSize && box.attached) {
+      final top = box.localToGlobal(Offset.zero).dy;
+      _visible =
+          top + box.size.height > 0 && top < MediaQuery.sizeOf(context).height;
+    }
+    _syncAnimation();
+  }
+
   @override
-  void didUpdateWidget(HumanVisualizer oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.reducedMotion != oldWidget.reducedMotion) {
-      if (widget.reducedMotion) {
-        _anim.stop();
-      } else {
-        _anim.repeat();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncAnimation();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    _syncAnimation();
+  }
+
+  @override
+  void didUpdateWidget(HumanVisualizer old) {
+    super.didUpdateWidget(old);
+    if (old.config != widget.config && _model != null) {
+      try {
+        _geometry = _model!.geometry(widget.config);
+      } catch (_) {
+        _failed = true;
       }
     }
+    _syncAnimation();
   }
 
   @override
   void dispose() {
-    _anim.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _visibility?.cancel();
+    _animation.dispose();
     super.dispose();
-  }
-
-  void _setPresetYaw(double target) {
-    setState(() {
-      _targetYaw = target;
-      if (widget.reducedMotion) {
-        _yaw = target;
-      }
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_hasError) {
-      return Container(
-        height: widget.stageHeight,
-        alignment: Alignment.center,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.person_outline, size: 48, color: BloomColors.inkSoft),
-            const SizedBox(height: 8),
-            Text('Could not render 3D model',
-                style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () => setState(() => _hasError = false),
-              icon: const Icon(Icons.refresh, size: 16),
-              label: const Text('Retry'),
-            ),
-          ],
-        ),
-      );
-    }
-
+    final goal = widget.isGoalPreview && widget.goalWeightKg != null;
+    final weight = goal ? widget.goalWeightKg! : widget.weightKg;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final effectiveWeight = (widget.isGoalPreview && widget.goalWeightKg != null)
-        ? widget.goalWeightKg!
-        : widget.weightKg;
-
     return SizedBox(
-      height: widget.stageHeight,
-      width: double.infinity,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.center,
-        children: [
-          // 1. Gesture detector for horizontal rotation while allowing vertical page scrolling
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onHorizontalDragStart: (_) => _isDragging = true,
-            onHorizontalDragUpdate: (details) {
-              setState(() {
-                _yaw += details.delta.dx * 0.015;
-                _targetYaw = _yaw;
-              });
-            },
-            onHorizontalDragEnd: (_) => _isDragging = false,
-            child: CustomPaint(
-              size: Size(double.infinity, widget.stageHeight),
-              painter: _Human3DPainter(
-                heightCm: widget.heightCm,
-                weightKg: effectiveWeight,
-                config: widget.config,
-                isFemale: widget.isFemale,
-                yaw: _yaw,
-                breathPhase: widget.reducedMotion ? 0.0 : _anim.value,
-                dark: dark,
-              ),
-            ),
-          ),
-
-          // 2. View Preset Controls (Floating Pill Buttons)
-          Positioned(
-            top: 12,
-            right: BloomSpacing.md,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-              decoration: BoxDecoration(
-                color: (dark ? Colors.black : Colors.white).withOpacity(0.72),
-                borderRadius: BorderRadius.circular(BloomRadii.pill),
-                border: Border.all(
-                  color: dark
-                      ? Colors.white.withOpacity(0.12)
-                      : BloomColors.line.withOpacity(0.8),
-                  width: 0.8,
+        height: widget.stageHeight,
+        child: ColoredBox(
+          color: dark ? BloomColors.bgD : BloomColors.bg,
+          child: Column(
+            children: [
+              Expanded(
+                child: Semantics(
+                  label:
+                      'Interactive approximate human visualization. ${goal ? "Illustrative goal" : "Current"} weight ${weight.toStringAsFixed(1)} kilograms. Drag horizontally to rotate.',
+                  child: _failed
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text('The 3D human could not load.'),
+                              TextButton.icon(
+                                onPressed: () => _load(retry: true),
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : _geometry == null
+                          ? const Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  CircularProgressIndicator(),
+                                  SizedBox(height: 12),
+                                  Text('Preparing your 3D human…'),
+                                ],
+                              ),
+                            )
+                          : RepaintBoundary(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onHorizontalDragUpdate: (d) =>
+                                    setState(() => _yaw += d.delta.dx * .012),
+                                child: SizedBox.expand(
+                                  child: CustomPaint(
+                                    painter: _Human3DPainter(
+                                      geometry: _geometry!,
+                                      heightCm: widget.heightCm,
+                                      weightKg: weight,
+                                      config: widget.config,
+                                      yaw: _yaw,
+                                      dark: dark,
+                                      breathPhase: widget.reducedMotion ||
+                                              MediaQuery.disableAnimationsOf(
+                                                  context)
+                                          ? 0
+                                          : _animation.value,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(dark ? 0.3 : 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _presetButton('Front', 0.0),
-                  _presetButton('3/4', math.pi * 0.25),
-                  _presetButton('Side', math.pi * 0.5),
-                  _presetButton('Back', math.pi),
-                  IconButton(
-                    icon: const Icon(Icons.refresh_rounded, size: 16),
-                    tooltip: 'Reset view to front',
-                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                    padding: EdgeInsets.zero,
-                    onPressed: () => _setPresetYaw(0.0),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // 3. Current vs Goal Preview Mode Selector (if goal weight exists)
-          if (widget.goalWeightKg != null && widget.onPreviewModeChanged != null)
-            Positioned(
-              top: 12,
-              left: BloomSpacing.md,
-              child: Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  color: (dark ? Colors.black : Colors.white).withOpacity(0.72),
-                  borderRadius: BorderRadius.circular(BloomRadii.pill),
-                  border: Border.all(
-                    color: dark
-                        ? Colors.white.withOpacity(0.12)
-                        : BloomColors.line.withOpacity(0.8),
-                    width: 0.8,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Wrap(
+                  spacing: 2,
+                  alignment: WrapAlignment.center,
                   children: [
-                    _modeChip('Current', !widget.isGoalPreview, () {
-                      widget.onPreviewModeChanged!(false);
-                    }),
-                    _modeChip('Goal preview', widget.isGoalPreview, () {
-                      widget.onPreviewModeChanged!(true);
-                    }),
-                  ],
-                ),
-              ),
-            ),
-
-          // 4. Subtle Drag Cue Hint (at bottom of stage)
-          Positioned(
-            bottom: 18,
-            child: IgnorePointer(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: (dark ? Colors.black : Colors.white).withOpacity(0.55),
-                  borderRadius: BorderRadius.circular(BloomRadii.pill),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.touch_app_outlined,
-                      size: 13,
-                      color: dark ? Colors.white70 : BloomColors.inkSoft,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Drag to rotate 360°',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: dark ? Colors.white70 : BloomColors.inkSoft,
+                    for (final v in [
+                      ('Front', 0.0),
+                      ('3/4', math.pi / 4),
+                      ('Side', math.pi / 2),
+                      ('Back', math.pi),
+                    ])
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(44, 44),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          backgroundColor: (_yaw - v.$2).abs() < .1
+                              ? (dark
+                                  ? BloomColors.paleLavenderD
+                                  : BloomColors.paleLavender)
+                              : null,
+                        ),
+                        onPressed: () => setState(() => _yaw = v.$2),
+                        child: Text(v.$1),
                       ),
+                    IconButton(
+                      tooltip: 'Reset view',
+                      onPressed: () => setState(() => _yaw = 0),
+                      icon: const Icon(Icons.restart_alt, size: 20),
                     ),
+                    if (widget.onEditMeasurements != null)
+                      IconButton(
+                        tooltip: 'Customize appearance',
+                        onPressed: widget.onEditMeasurements,
+                        icon: const Icon(Icons.palette_outlined, size: 20),
+                      ),
                   ],
                 ),
               ),
-            ),
+              if (widget.goalWeightKg != null &&
+                  widget.onPreviewModeChanged != null)
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Current'),
+                      selected: !goal,
+                      onSelected: (_) => widget.onPreviewModeChanged!(false),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Illustrative goal'),
+                      selected: goal,
+                      onSelected: (_) => widget.onPreviewModeChanged!(true),
+                    ),
+                  ],
+                ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _presetButton(String label, double yawTarget) {
-    // Normalizing angles to check active preset
-    final currentNorm = (_yaw % (2 * math.pi) + 2 * math.pi) % (2 * math.pi);
-    final targetNorm = (yawTarget % (2 * math.pi) + 2 * math.pi) % (2 * math.pi);
-    final active = (currentNorm - targetNorm).abs() < 0.2 ||
-        (currentNorm - targetNorm - 2 * math.pi).abs() < 0.2;
-
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final primary = Theme.of(context).colorScheme.primary;
-
-    return InkWell(
-      onTap: () => _setPresetYaw(yawTarget),
-      borderRadius: BorderRadius.circular(BloomRadii.pill),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-        decoration: BoxDecoration(
-          color: active
-              ? (dark ? primary.withOpacity(0.28) : primary.withOpacity(0.15))
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(BloomRadii.pill),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11.5,
-            fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-            color: active
-                ? primary
-                : (dark ? Colors.white70 : BloomColors.ink),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _modeChip(String label, bool active, VoidCallback onTap) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final primary = Theme.of(context).colorScheme.primary;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(BloomRadii.pill),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: active
-              ? (dark ? primary.withOpacity(0.3) : primary.withOpacity(0.16))
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(BloomRadii.pill),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-            color: active ? primary : (dark ? Colors.white70 : BloomColors.ink),
-          ),
-        ),
-      ),
-    );
+        ));
   }
 }
 
-/// Hardware-accelerated 3D software rasterizer for the human body mesh.
 class _Human3DPainter extends CustomPainter {
-  final double heightCm;
-  final double weightKg;
+  final HumanGeometry geometry;
+  final double heightCm, weightKg, yaw, breathPhase;
   final AvatarConfig config;
-  final bool isFemale;
-  final double yaw;
-  final double breathPhase;
   final bool dark;
-
   _Human3DPainter({
+    required this.geometry,
     required this.heightCm,
     required this.weightKg,
     required this.config,
-    required this.isFemale,
     required this.yaw,
     required this.breathPhase,
     required this.dark,
   });
-
   @override
   void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
+    if (size.isEmpty) return;
+    canvas.drawRect(Offset.zero & size,
+        Paint()..color = dark ? BloomColors.heroPeachD : BloomColors.heroPeach);
+    final floor = Path()
+      ..moveTo(0, size.height * .72)
+      ..quadraticBezierTo(
+          size.width * .5, size.height * .57, size.width, size.height * .72)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(
+        floor, Paint()..color = dark ? BloomColors.bgD : BloomColors.bg);
 
-    // 1. Compute morphed 3D vertices
-    final vertices = HumanBodyMesh.computeMorphedVertices(
+    final points = geometry.deform(
       heightCm: heightCm,
       weightKg: weightKg,
-      waistCm: config.waistCm,
-      hipCm: config.hipCm,
-      chestCm: config.chestCm,
-      frame: config.frame,
-      breathPhase: breathPhase,
-      isFemale: isFemale,
+      config: config,
+      breath: math.sin(breathPhase * math.pi * 2),
     );
-
-    // 2. Camera & Projection Setup
-    // Center of model is at (x=0, y ~ 86cm)
-    const cameraDistance = 220.0;
-    const fov = 400.0; // focal length for prominent full-body presence
-    final groundY = h * 0.90; // ground level in screen coordinates
-    final cx = w * 0.5;
-
-    // Rotation angles
-    final cosY = math.cos(yaw);
-    final sinY = math.sin(yaw);
-    // Slight downward pitch angle to simulate eye-level view
-    const pitch = 0.05; // radians (~3 degrees)
-    final cosP = math.cos(pitch);
-    final sinP = math.sin(pitch);
-
-    // 3. Render Floor Contact Shadow
-    final shadowPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          (dark ? Colors.black : const Color(0xFF6B4E3D)).withOpacity(dark ? 0.45 : 0.22),
-          (dark ? Colors.black : const Color(0xFF6B4E3D)).withOpacity(dark ? 0.15 : 0.06),
-          Colors.transparent,
-        ],
-        stops: const [0.0, 0.5, 1.0],
-      ).createShader(Rect.fromCenter(
-        center: Offset(cx, groundY + 4),
-        width: 150,
-        height: 42,
-      ));
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset(cx, groundY + 4), width: 150, height: 42),
-      shadowPaint,
-    );
-
-    // Individual shoe contact shadows
-    final shoeSpread = 18.0;
-    final shoeShadowPaint = Paint()
-      ..color = (dark ? Colors.black : const Color(0xFF3E281E)).withOpacity(dark ? 0.35 : 0.18)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset(cx - shoeSpread * cosY, groundY + 2), width: 32, height: 14),
-      shoeShadowPaint,
-    );
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset(cx + shoeSpread * cosY, groundY + 2), width: 32, height: 14),
-      shoeShadowPaint,
-    );
-
-    // 4. Transform Vertices to Camera Space & Project to 2D
-    final projected = List<Offset>.filled(vertices.length, Offset.zero);
-    final camZ = List<double>.filled(vertices.length, 0.0);
-
-    for (var i = 0; i < vertices.length; i++) {
-      final v = vertices[i];
-      // Yaw rotation around Y axis
-      final rx = v.x * cosY + v.z * sinY;
-      final rz0 = -v.x * sinY + v.z * cosY;
-
-      // Pitch rotation around X axis
-      final ry = (v.y - 86.0) * cosP - rz0 * sinP + 86.0;
-      final rz = (v.y - 86.0) * sinP + rz0 * cosP;
-
-      final z = cameraDistance - rz;
-      camZ[i] = z;
-
-      final scale = fov / z;
-      final px = cx + rx * scale;
-      final py = groundY - ry * scale * 1.05;
-      projected[i] = Offset(px, py);
-    }
-
-    // 5. Material Colors Palette
-    final skinBase = _skinColor(config.skinTone);
-    final hairBase = _hairColor(config.hairColor);
-    final topBase = _clothingColor(config.clothingColor);
-    final shortsBase = switch (config.clothingStyle) {
-      ClothingStyle.twoPieceAthletic => _shortsColor(config.clothingColor),
-      ClothingStyle.fullBodyFit => _clothingColor(config.clothingColor),
-      ClothingStyle.relaxedSet => _shortsColor(config.clothingColor).withOpacity(0.92),
-    };
-    final shoeMidsoleBase = const Color(0xFFFAFBFD);
-    final shoeUpperBase = _shoeUpperColor(config.clothingColor);
-
-    // 6. Studio Lighting Vectors
-    // Key Light: warm directional from top-left-front
-    const keyL = [0.45, 0.65, 0.60];
-    // Fill Light: soft cool ambient from right-front
-    const fillL = [-0.50, 0.30, 0.81];
-
-    // 7. Depth Sort Faces (Painter's Algorithm)
-    final faces = HumanBodyMesh.faces;
-    final sortedIndices = List<int>.generate(faces.length, (i) => i);
-
-    sortedIndices.sort((a, b) {
-      final fa = faces[a];
-      final fb = faces[b];
-      final za = (camZ[fa.i0] + camZ[fa.i1] + camZ[fa.i2]) / 3.0;
-      final zb = (camZ[fb.i0] + camZ[fb.i1] + camZ[fb.i2]) / 3.0;
-      return za.compareTo(zb); // back to front
-    });
-
-    final polyPaint = Paint()..style = PaintingStyle.fill;
-    final strokePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.4
-      ..strokeJoin = StrokeJoin.round;
-
-    // 8. Render Triangles
-    for (final idx in sortedIndices) {
-      final f = faces[idx];
-      final p0 = projected[f.i0];
-      final p1 = projected[f.i1];
-      final p2 = projected[f.i2];
-
-      // Screen-space 2D cross product for back-face culling
-      final cross = (p1.dx - p0.dx) * (p2.dy - p0.dy) - (p1.dy - p0.dy) * (p2.dx - p0.dx);
-      if (cross <= 0) continue; // culled
-
-      // Compute normal in model space
-      final v0 = vertices[f.i0];
-      final v1 = vertices[f.i1];
-      final v2 = vertices[f.i2];
-
-      final ax = v1.x - v0.x;
-      final ay = v1.y - v0.y;
-      final az = v1.z - v0.z;
-
-      final bx = v2.x - v0.x;
-      final by = v2.y - v0.y;
-      final bz = v2.z - v0.z;
-
-      var nx = ay * bz - az * by;
-      var ny = az * bx - ax * bz;
-      var nz = ax * by - ay * bx;
-      final len = math.sqrt(nx * nx + ny * ny + nz * nz);
-      if (len > 0.0001) {
-        nx /= len;
-        ny /= len;
-        nz /= len;
+    final normals = List.generate(points.length, (_) => Vec3(0, 0, 0));
+    for (final f in geometry.faces) {
+      final a = points[f.i0], b = points[f.i1], c = points[f.i2];
+      final nx = (b.y - a.y) * (c.z - a.z) - (b.z - a.z) * (c.y - a.y);
+      final ny = (b.z - a.z) * (c.x - a.x) - (b.x - a.x) * (c.z - a.z);
+      final nz = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+      for (final i in [f.i0, f.i1, f.i2]) {
+        normals[i].x += nx;
+        normals[i].y += ny;
+        normals[i].z += nz;
       }
-
-      // Rotate normal by camera yaw
-      final rnx = nx * cosY + nz * sinY;
-      final rny = ny;
-      final rnz = -nx * sinY + nz * cosY;
-
-      // Studio Lighting Calculation: Key, Fill, Rim, and Clay Specular
-      final dotKey = (rnx * keyL[0] + rny * keyL[1] + rnz * keyL[2]).clamp(0.0, 1.0);
-      final dotFill = (rnx * fillL[0] + rny * fillL[1] + rnz * fillL[2]).clamp(0.0, 1.0);
-
-      // Fresnel rim lighting for dimensional silhouette glow
-      final rim = math.pow((1.0 - rnz.abs()).clamp(0.0, 1.0), 3.0) * 0.25;
-
-      // Subtle Blinn-Phong specular highlight for soft clay sheen
-      const halfV = [0.24, 0.35, 0.90];
-      final dotH = (rnx * halfV[0] + rny * halfV[1] + rnz * halfV[2]).clamp(0.0, 1.0);
-      final spec = math.pow(dotH, 10.0) * 0.20;
-
-      // Total light intensity
-      final intensity = (0.34 + 0.44 * dotKey + 0.22 * dotFill + rim + spec).clamp(0.0, 1.0);
-
-      // Material base color
-      final baseColor = switch (f.matId) {
-        0 => skinBase,
-        1 => hairBase,
-        2 => topBase,
-        3 => shortsBase,
-        4 => shoeMidsoleBase,
-        5 => shoeUpperBase,
-        6 => const Color(0xFF2E2620), // subtle facial features / eye brows
-        _ => skinBase,
-      };
-
-      final litColor = _applyLight(baseColor, intensity);
-      polyPaint.color = litColor;
-      strokePaint.color = litColor.withOpacity(0.9);
-
-      final path = Path()
-        ..moveTo(p0.dx, p0.dy)
-        ..lineTo(p1.dx, p1.dy)
-        ..lineTo(p2.dx, p2.dy)
-        ..close();
-
-      canvas.drawPath(path, polyPaint);
-      canvas.drawPath(path, strokePaint);
     }
+    final cy = math.cos(yaw), sy = math.sin(yaw);
+    // Fit the projected bounds, including hair, hands and shoes, to every stage.
+    final raw = <Offset>[], depth = <double>[];
+    for (final p in points) {
+      final x = p.x * cy + p.z * sy, z = -p.x * sy + p.z * cy;
+      final d = 420 - z;
+      raw.add(Offset(x * 420 / d, -p.y * 420 / d));
+      depth.add(d);
+    }
+    var minX = double.infinity,
+        maxX = -double.infinity,
+        minY = double.infinity,
+        maxY = -double.infinity;
+    for (final p in raw) {
+      minX = math.min(minX, p.dx);
+      maxX = math.max(maxX, p.dx);
+      minY = math.min(minY, p.dy);
+      maxY = math.max(maxY, p.dy);
+    }
+    final scale = math.min(
+      (size.height - 20) / (maxY - minY),
+      (size.width - 50) / (maxX - minX),
+    );
+    final dx = size.width / 2 - (minX + maxX) * .5 * scale,
+        dy = size.height - 10 - maxY * scale;
+    final projected =
+        raw.map((p) => Offset(p.dx * scale + dx, p.dy * scale + dy)).toList();
+    final shadow = Rect.fromCenter(
+      center: Offset(size.width / 2, size.height - 8),
+      width: 80 * scale,
+      height: 14 * scale,
+    );
+    canvas.drawOval(
+      shadow,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            Colors.black.withOpacity(dark ? .35 : .18),
+            Colors.transparent,
+          ],
+        ).createShader(shadow),
+    );
+    final sorted = List<int>.generate(geometry.faces.length, (i) => i)
+      ..sort((a, b) {
+        final fa = geometry.faces[a], fb = geometry.faces[b];
+        return (depth[fb.i0] + depth[fb.i1] + depth[fb.i2]).compareTo(
+          depth[fa.i0] + depth[fa.i1] + depth[fa.i2],
+        );
+      });
+    final palette = [
+      _skinColor(config.skinTone),
+      _hairColor(config.hairColor),
+      _clothingColor(config.clothingColor),
+      _shortsColor(config.clothingColor),
+      const Color(0xFFFAFBFD),
+      _shoeUpperColor(config.clothingColor),
+      const Color(0xFF292331),
+      const Color(0xFFFFFDF8),
+      const Color(0xFF694D36),
+      const Color(0xFFB97069),
+    ];
+    final positions = <Offset>[], colors = <Color>[];
+    for (final idx in sorted) {
+      final f = geometry.faces[idx];
+      final a = projected[f.i0], b = projected[f.i1], c = projected[f.i2];
+      if ((b.dx - a.dx) * (c.dy - a.dy) - (b.dy - a.dy) * (c.dx - a.dx) >= 0)
+        continue;
+      final material = geometry.material(f, config);
+      if (material == 10) continue;
+      final base = palette[material];
+      for (final i in [f.i0, f.i1, f.i2]) {
+        final n = normals[i];
+        final len = math.sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
+        final nx = (n.x * cy + n.z * sy) / len,
+            ny = n.y / len,
+            nz = (-n.x * sy + n.z * cy) / len;
+        final key = math.max(0.0, nx * -.35 + ny * .65 + nz * .68),
+            fill = math.max(0.0, nx * .65 + ny * .2 + nz * .73);
+        final spec =
+            math.pow(math.max(0.0, nx * -.18 + ny * .36 + nz * .91), 22) * .14;
+        colors.add(
+          _applyLight(
+            base,
+            (.38 + .42 * key + .16 * fill + spec).clamp(0.0, 1.0),
+          ),
+        );
+        positions.add(projected[i]);
+      }
+    }
+    canvas.drawVertices(
+      ui.Vertices(ui.VertexMode.triangles, positions, colors: colors),
+      BlendMode.srcOver,
+      Paint(),
+    );
   }
 
   Color _applyLight(Color base, double factor) {
@@ -568,7 +421,8 @@ class _Human3DPainter extends CustomPainter {
     } else {
       // Shadow blending with warm rich tone
       final t = ((0.68 - factor) / 0.68).clamp(0.0, 1.0);
-      final shadowTone = dark ? const Color(0xFF1B1B26) : const Color(0xFF42332C);
+      final shadowTone =
+          dark ? const Color(0xFF1B1B26) : const Color(0xFF42332C);
       return Color.lerp(base, shadowTone, t * 0.50)!;
     }
   }
@@ -616,12 +470,12 @@ class _Human3DPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _Human3DPainter oldDelegate) {
-    return oldDelegate.yaw != yaw ||
+    return oldDelegate.geometry != geometry ||
+        oldDelegate.yaw != yaw ||
         oldDelegate.breathPhase != breathPhase ||
         oldDelegate.heightCm != heightCm ||
         oldDelegate.weightKg != weightKg ||
         oldDelegate.config != config ||
-        oldDelegate.isFemale != isFemale ||
         oldDelegate.dark != dark;
   }
 }

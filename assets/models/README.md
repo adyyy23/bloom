@@ -1,3 +1,5 @@
+> Active renderer: the original human in `bloom_human.mesh.gz`. See [license and provenance](BLOOM_HUMAN_LICENSE.md) and [review](../../docs/HUMAN_STAGE_REVIEW.md). The older assets below are retained for compatibility and are not the active human renderer.
+
 # Bloom 3D Model Assets & Documentation
 
 ## 1. human_body.glb & human_body.obj
