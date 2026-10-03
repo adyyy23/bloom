@@ -43,7 +43,11 @@ class Dates {
 
   /// Duration between bedtime and wake, correctly crossing midnight.
   /// Times are "HH:mm" strings on the date the user woke.
-  static Duration sleepDuration(String bedtimeHHmm, String wakeHHmm, String wakeDateKey) {
+  static Duration sleepDuration(
+    String bedtimeHHmm,
+    String wakeHHmm,
+    String wakeDateKey,
+  ) {
     final wake = parseKey(wakeDateKey);
     final bp = bedtimeHHmm.split(':').map(int.parse).toList();
     final wp = wakeHHmm.split(':').map(int.parse).toList();
@@ -82,19 +86,23 @@ class Units {
   static double mlToFloz(double ml) => ml / mlPerFloz;
   static double flozToMl(double floz) => floz * mlPerFloz;
 
-  static String weight(double kg, String units) =>
-      units == 'imperial' ? '${kgToLb(kg).toStringAsFixed(1)} lb' : '${kg.toStringAsFixed(1)} kg';
+  static String weight(double kg, String units) => units == 'imperial'
+      ? '${kgToLb(kg).toStringAsFixed(1)} lb'
+      : '${kg.toStringAsFixed(1)} kg';
 
-  static String weightShort(double kg, String units) =>
-      units == 'imperial' ? kgToLb(kg).toStringAsFixed(1) : kg.toStringAsFixed(1);
+  static String weightShort(double kg, String units) => units == 'imperial'
+      ? kgToLb(kg).toStringAsFixed(1)
+      : kg.toStringAsFixed(1);
 
   static String weightUnit(String units) => units == 'imperial' ? 'lb' : 'kg';
 
-  static String length(double cm, String units) =>
-      units == 'imperial' ? '${cmToIn(cm).toStringAsFixed(1)} in' : '${cm.toStringAsFixed(1)} cm';
+  static String length(double cm, String units) => units == 'imperial'
+      ? '${cmToIn(cm).toStringAsFixed(1)} in'
+      : '${cm.toStringAsFixed(1)} cm';
 
-  static String volume(double ml, String units) =>
-      units == 'imperial' ? '${mlToFloz(ml).toStringAsFixed(0)} fl oz' : '${ml.toStringAsFixed(0)} ml';
+  static String volume(double ml, String units) => units == 'imperial'
+      ? '${mlToFloz(ml).toStringAsFixed(0)} fl oz'
+      : '${ml.toStringAsFixed(0)} ml';
 
   static String distance(double meters, String units) {
     if (units == 'imperial') {
@@ -142,7 +150,8 @@ class Calc {
     required bool allowEstimate,
   }) {
     if (!allowEstimate) return null;
-    final double bmr = 10 * weightKg + 6.25 * heightCm - 5 * ageYears + (isFemale ? -161 : 5);
+    final double bmr =
+        10 * weightKg + 6.25 * heightCm - 5 * ageYears + (isFemale ? -161 : 5);
     final factor = switch (activityLevel) {
       'low' => 1.2,
       'moderate' => 1.375,
@@ -160,7 +169,11 @@ class Calc {
   }
 
   /// Protein-forward macro split from a kcal target.
-  static Map<String, double> macroTargets(double kcal, double weightKg, String goal) {
+  static Map<String, double> macroTargets(
+    double kcal,
+    double weightKg,
+    String goal,
+  ) {
     final proteinPerKg = switch (goal) {
       'gain' => 1.8,
       'lose' => 1.8,
@@ -169,7 +182,8 @@ class Calc {
     };
     final protein = (proteinPerKg * weightKg).clamp(40, 220).toDouble();
     final fat = (kcal * 0.28 / 9).clamp(30, 120).toDouble();
-    final carbs = ((kcal - protein * 4 - fat * 9) / 4).clamp(60, 500).toDouble();
+    final carbs =
+        ((kcal - protein * 4 - fat * 9) / 4).clamp(60, 500).toDouble();
     final fiber = (kcal / 1000 * 14).clamp(15, 40).toDouble();
     return {'protein': protein, 'fat': fat, 'carbs': carbs, 'fiber': fiber};
   }
@@ -200,7 +214,7 @@ class Calc {
   ///
   /// Note:
   /// BMI is a screening measure and does not describe body composition or overall health.
-  /// Standard categories do not apply to minors (<18y) or during pregnancy/nursing.
+  /// Standard categories do not apply to minors (<20y) or during pregnancy/nursing.
   static BmiResult? calculateBmi({
     required double? weightKg,
     required double? heightCm,
@@ -208,23 +222,19 @@ class Calc {
     bool pregnancyOrNursing = false,
     bool specializedGuidance = false,
   }) {
-    if (weightKg == null || heightCm == null || weightKg <= 0 || heightCm <= 0) return null;
+    if (weightKg == null ||
+        heightCm == null ||
+        !weightKg.isFinite ||
+        !heightCm.isFinite ||
+        weightKg <= 0 ||
+        heightCm <= 0) return null;
     final heightM = heightCm / 100.0;
     final bmi = weightKg / (heightM * heightM);
+    if (!bmi.isFinite) return null;
 
     final currentYear = DateTime.now().year;
-    final age = birthYear != null ? currentYear - birthYear : 30;
-
-    // Pediatric check
-    if (age < 18) {
-      return BmiResult(
-        bmi: bmi,
-        category: 'Age <18',
-        color: const Color(0xFF64B5F6),
-        isApplicable: false,
-        note: 'Adult BMI categories do not apply to minors. Growth percentiles should be used.',
-      );
-    }
+    // Only a birth year is stored: use the youngest possible age this year.
+    final age = birthYear != null ? currentYear - birthYear - 1 : 0;
 
     // Pregnancy / Nursing check
     if (pregnancyOrNursing) {
@@ -233,7 +243,8 @@ class Calc {
         category: 'Pregnancy/Nursing',
         color: const Color(0xFFFFB74D),
         isApplicable: false,
-        note: 'Standard BMI categories are not applicable during pregnancy or nursing.',
+        note:
+            'Standard BMI categories are not applicable during pregnancy or nursing.',
       );
     }
 
@@ -244,7 +255,21 @@ class Calc {
         category: 'Specialized care',
         color: const Color(0xFFBA68C8),
         isApplicable: false,
-        note: 'Clinical provider guidance supersedes population screening metrics.',
+        note:
+            'Clinical provider guidance supersedes population screening metrics.',
+      );
+    }
+
+    // Pediatric check
+    if (birthYear == null || age < 20) {
+      return BmiResult(
+        bmi: bmi,
+        category: birthYear == null ? 'Age needed' : 'Age <20',
+        color: const Color(0xFF64B5F6),
+        isApplicable: false,
+        note: birthYear == null
+            ? 'Add your age to check whether adult screening categories apply.'
+            : 'CDC adult categories apply at age 20 and older. Growth assessment uses age-specific guidance.',
       );
     }
 
@@ -254,28 +279,32 @@ class Calc {
         bmi: bmi,
         category: 'Underweight',
         color: const Color(0xFF64B5F6), // soft sky blue
-        note: 'BMI is a screening measure and does not describe body composition or overall health.',
+        note:
+            'BMI is a screening measure and does not describe body composition or overall health.',
       );
     } else if (bmi < 25.0) {
       return BmiResult(
         bmi: bmi,
-        category: 'Normal weight',
-        color: const Color(0xFF81C784), // soft calm green
-        note: 'BMI is a screening measure and does not describe body composition or overall health.',
+        category: 'Standard range',
+        color: const Color(0xFF7560D5), // category, not a health verdict
+        note:
+            'BMI is a screening measure and does not describe body composition or overall health.',
       );
     } else if (bmi < 30.0) {
       return BmiResult(
         bmi: bmi,
         category: 'Overweight',
         color: const Color(0xFFFFB74D), // soft warm amber
-        note: 'BMI is a screening measure and does not describe body composition or overall health.',
+        note:
+            'BMI is a screening measure and does not describe body composition or overall health.',
       );
     } else {
       return BmiResult(
         bmi: bmi,
         category: 'Obesity',
         color: const Color(0xFFE57373), // soft coral
-        note: 'BMI is a screening measure and does not describe body composition or overall health.',
+        note:
+            'BMI is a screening measure and does not describe body composition or overall health.',
       );
     }
   }

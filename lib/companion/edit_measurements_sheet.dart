@@ -1,672 +1,388 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../core/theme.dart';
 import '../core/utils.dart';
-import '../core/widgets.dart';
 import '../data/models.dart';
 import '../data/repositories.dart';
 import 'human_body_mesh.dart';
 import 'human_visualizer.dart';
 
-/// Bubble-style bottom sheet for editing user body measurements and 3D avatar appearance.
+/// Appearance transactions never write to profile, weight or measurement logs.
+class AppearanceSheet extends ConsumerStatefulWidget {
+  const AppearanceSheet({super.key});
+  @override
+  ConsumerState<AppearanceSheet> createState() => _AppearanceSheetState();
+}
+
+class _AppearanceSheetState extends ConsumerState<AppearanceSheet> {
+  late AvatarConfig draft;
+  bool saving = false;
+  @override
+  void initState() {
+    super.initState();
+    draft = ref.read(avatarRepoProvider).config;
+  }
+
+  Widget choices<T>(
+    String title,
+    List<T> values,
+    T selected,
+    ValueChanged<T> change,
+  ) {
+    String label(T v) {
+      final name = (v as Enum).name.replaceAllMapped(
+        RegExp(r'([a-z])([A-Z])'),
+        (m) => '${m[1]} ${m[2]}',
+      );
+      return name[0].toUpperCase() + name.substring(1);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 16, bottom: 6),
+          child: Text(title, style: Theme.of(context).textTheme.titleSmall),
+        ),
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          children: [
+            for (final v in values)
+              ChoiceChip(
+                label: Text(label(v)),
+                selected: v == selected,
+                onSelected: saving ? null : (_) => setState(() => change(v)),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = ref.watch(profileRepoProvider).profile;
+    final progress = ref.watch(progressRepoProvider);
+    final settings = ref.watch(settingsRepoProvider).settings;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Make it yours',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+        const Text(
+          'Appearance only. Your measurements and records stay separate.',
+        ),
+        Container(
+          margin: const EdgeInsets.only(top: 12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? BloomColors.heroPeachD
+                : BloomColors.heroPeach,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: HumanVisualizer(
+            stageHeight: 300,
+            heightCm: p.heightCm ?? 170,
+            weightKg: progress.latest?.weightKg ?? p.startWeightKg ?? 65,
+            reducedMotion: settings.reducedMotion,
+            config: draft.copyWith(
+              waistCm: progress.latestMeasure('waist'),
+              hipCm: progress.latestMeasure('hips'),
+              chestCm: progress.latestMeasure('chest'),
+            ),
+          ),
+        ),
+        choices(
+          'Face',
+          FacePreset.values,
+          draft.facePreset,
+          (v) => draft = draft.copyWith(facePreset: v),
+        ),
+        choices(
+          'Skin tone',
+          SkinTone.values,
+          draft.skinTone,
+          (v) => draft = draft.copyWith(skinTone: v),
+        ),
+        choices(
+          'Hair',
+          HairStyle.values,
+          draft.hairStyle,
+          (v) => draft = draft.copyWith(hairStyle: v),
+        ),
+        choices(
+          'Hair color',
+          HairColor.values,
+          draft.hairColor,
+          (v) => draft = draft.copyWith(hairColor: v),
+        ),
+        choices(
+          'Exercise clothing',
+          ClothingStyle.values,
+          draft.clothingStyle,
+          (v) => draft = draft.copyWith(clothingStyle: v),
+        ),
+        choices(
+          'Clothing color',
+          ClothingColor.values,
+          draft.clothingColor,
+          (v) => draft = draft.copyWith(clothingColor: v),
+        ),
+        choices(
+          'Illustrative frame',
+          BodyFrame.values,
+          draft.frame,
+          (v) => draft = draft.copyWith(frame: v),
+        ),
+        choices(
+          'Accessory',
+          AvatarAccessory.values,
+          draft.accessory,
+          (v) => draft = draft.copyWith(accessory: v),
+        ),
+        const SizedBox(height: 20),
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            TextButton(
+              onPressed: saving
+                  ? null
+                  : () => setState(() => draft = const AvatarConfig()),
+              child: const Text('Reset appearance'),
+            ),
+            FilledButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      setState(() => saving = true);
+                      try {
+                        await ref.read(avatarRepoProvider).save(draft);
+                        if (mounted) Navigator.pop(context, true);
+                      } catch (_) {
+                        if (mounted) {
+                          setState(() => saving = false);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Could not save appearance. Please retry.',
+                              ),
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: Text(saving ? 'Saving…' : 'Save appearance'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class EditMeasurementsSheet extends ConsumerStatefulWidget {
   const EditMeasurementsSheet({super.key});
-
   @override
   ConsumerState<EditMeasurementsSheet> createState() =>
       _EditMeasurementsSheetState();
 }
 
-class _EditMeasurementsSheetState
-    extends ConsumerState<EditMeasurementsSheet> {
-  late final TextEditingController _weightCtrl;
-  late final TextEditingController _heightCtrl;
-  late final TextEditingController _waistCtrl;
-  late final TextEditingController _hipCtrl;
-  late final TextEditingController _chestCtrl;
-
-  late BodyFrame _frame;
-  late SkinTone _skinTone;
-  late HairStyle _hairStyle;
-  late HairColor _hairColor;
-  late ClothingColor _clothingColor;
-  late FacePreset _facePreset;
-  late ClothingStyle _clothingStyle;
-
+class _EditMeasurementsSheetState extends ConsumerState<EditMeasurementsSheet> {
+  final form = GlobalKey<FormState>();
+  final fields = <String, TextEditingController>{};
+  final original = <String, double?>{};
+  bool saving = false;
+  String? error;
+  bool get imperial =>
+      ref.read(profileRepoProvider).profile.units == 'imperial';
   @override
   void initState() {
     super.initState();
-    final profile = ref.read(profileRepoProvider).profile;
-    final progress = ref.read(progressRepoProvider);
-    final avatar = ref.read(avatarRepoProvider).config;
+    final p = ref.read(profileRepoProvider).profile;
+    final r = ref.read(progressRepoProvider);
+    original.addAll({
+      'weight': r.latest?.weightKg ?? p.startWeightKg,
+      'height': p.heightCm,
+      'waist': r.latestMeasure('waist'),
+      'hips': r.latestMeasure('hips'),
+      'chest': r.latestMeasure('chest'),
+    });
+    for (final k in original.keys) {
+      final value = original[k];
+      final display = value == null
+          ? null
+          : imperial
+          ? (k == 'weight' ? Units.kgToLb(value) : Units.cmToIn(value))
+          : value;
+      fields[k] = TextEditingController(
+        text: display?.toStringAsFixed(2) ?? '',
+      );
+    }
+  }
 
-    final latestWeight = progress.latest?.weightKg ?? profile.startWeightKg ?? 65.0;
-    final weightDisplay = profile.units == 'imperial'
-        ? Units.kgToLb(latestWeight)
-        : latestWeight;
-    _weightCtrl = TextEditingController(text: weightDisplay.toStringAsFixed(1));
-
-    final heightVal = profile.heightCm ?? 170.0;
-    final heightDisplay = profile.units == 'imperial'
-        ? Units.cmToIn(heightVal)
-        : heightVal;
-    _heightCtrl = TextEditingController(text: heightDisplay.toStringAsFixed(0));
-
-    final waistVal = avatar.waistCm ?? progress.latestMeasure('waist');
-    _waistCtrl = TextEditingController(
-      text: waistVal != null
-          ? (profile.units == 'imperial'
-                  ? Units.cmToIn(waistVal)
-                  : waistVal)
-              .toStringAsFixed(1)
-          : '',
-    );
-
-    final hipVal = avatar.hipCm ?? progress.latestMeasure('hips');
-    _hipCtrl = TextEditingController(
-      text: hipVal != null
-          ? (profile.units == 'imperial' ? Units.cmToIn(hipVal) : hipVal)
-              .toStringAsFixed(1)
-          : '',
-    );
-
-    final chestVal = avatar.chestCm ?? progress.latestMeasure('chest');
-    _chestCtrl = TextEditingController(
-      text: chestVal != null
-          ? (profile.units == 'imperial' ? Units.cmToIn(chestVal) : chestVal)
-              .toStringAsFixed(1)
-          : '',
-    );
-
-    _frame = avatar.frame;
-    _skinTone = avatar.skinTone;
-    _hairStyle = avatar.hairStyle;
-    _hairColor = avatar.hairColor;
-    _clothingColor = avatar.clothingColor;
-    _facePreset = avatar.facePreset;
-    _clothingStyle = avatar.clothingStyle;
+  double? value(String k) {
+    final n = double.tryParse(fields[k]!.text);
+    if (n == null) return null;
+    return imperial ? (k == 'weight' ? Units.lbToKg(n) : Units.inToCm(n)) : n;
   }
 
   @override
   void dispose() {
-    _weightCtrl.dispose();
-    _heightCtrl.dispose();
-    _waistCtrl.dispose();
-    _hipCtrl.dispose();
-    _chestCtrl.dispose();
+    for (final c in fields.values) c.dispose();
     super.dispose();
   }
 
-  Future<void> _save() async {
-    final profile = ref.read(profileRepoProvider).profile;
-    final isImperial = profile.units == 'imperial';
-
-    // Parse weight
-    final wVal = double.tryParse(_weightCtrl.text.trim());
-    if (wVal != null && wVal > 0) {
-      final wKg = isImperial ? Units.lbToKg(wVal) : wVal;
-      await ref.read(progressRepoProvider).addWeight(
+  Future<void> save() async {
+    if (!form.currentState!.validate()) return;
+    setState(() {
+      saving = true;
+      error = null;
+    });
+    try {
+      final repo = ref.read(progressRepoProvider);
+      for (final k in fields.keys) {
+        final n = value(k);
+        if (n == null || ((n - (original[k] ?? 0)).abs() < .03)) continue;
+        if (k == 'weight') {
+          await repo.addWeight(
             WeightEntry(
               id: newId(),
               dateKey: Dates.todayKey(),
-              weightKg: wKg,
-              note: 'Updated from 3D Body Visualizer',
+              weightKg: n,
+              note: 'Measurement update',
             ),
           );
-    }
-
-    // Parse height
-    final hVal = double.tryParse(_heightCtrl.text.trim());
-    if (hVal != null && hVal > 0) {
-      final hCm = isImperial ? Units.inToCm(hVal) : hVal;
-      await ref.read(profileRepoProvider).update((p) {
-        p.heightCm = hCm;
-        return p;
-      });
-    }
-
-    // Parse optional circumference measurements
-    final waistRaw = double.tryParse(_waistCtrl.text.trim());
-    final waistCm = waistRaw != null && waistRaw > 0
-        ? (isImperial ? Units.inToCm(waistRaw) : waistRaw)
-        : null;
-    if (waistCm != null) {
-      await ref.read(progressRepoProvider).addMeasure(BodyMeasure(
-            id: newId(),
-            dateKey: Dates.todayKey(),
-            type: 'waist',
-            valueCm: waistCm,
-          ));
-    }
-
-    final hipRaw = double.tryParse(_hipCtrl.text.trim());
-    final hipCm = hipRaw != null && hipRaw > 0
-        ? (isImperial ? Units.inToCm(hipRaw) : hipRaw)
-        : null;
-    if (hipCm != null) {
-      await ref.read(progressRepoProvider).addMeasure(BodyMeasure(
-            id: newId(),
-            dateKey: Dates.todayKey(),
-            type: 'hips',
-            valueCm: hipCm,
-          ));
-    }
-
-    final chestRaw = double.tryParse(_chestCtrl.text.trim());
-    final chestCm = chestRaw != null && chestRaw > 0
-        ? (isImperial ? Units.inToCm(chestRaw) : chestRaw)
-        : null;
-    if (chestCm != null) {
-      await ref.read(progressRepoProvider).addMeasure(BodyMeasure(
-            id: newId(),
-            dateKey: Dates.todayKey(),
-            type: 'chest',
-            valueCm: chestCm,
-          ));
-    }
-
-    // Save avatar configuration
-    final newConfig = AvatarConfig(
-      frame: _frame,
-      skinTone: _skinTone,
-      hairStyle: _hairStyle,
-      hairColor: _hairColor,
-      clothingColor: _clothingColor,
-      facePreset: _facePreset,
-      clothingStyle: _clothingStyle,
-      waistCm: waistCm,
-      hipCm: hipCm,
-      chestCm: chestCm,
-    );
-    await ref.read(avatarRepoProvider).save(newConfig);
-
-    if (mounted) {
-      Navigator.of(context).pop(true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Measurements and avatar updated.')),
-      );
+        } else if (k == 'height') {
+          await ref.read(profileRepoProvider).update((p) {
+            p.heightCm = n;
+            return p;
+          });
+        } else {
+          await repo.addMeasure(
+            BodyMeasure(
+              id: newId(),
+              dateKey: Dates.todayKey(),
+              type: k,
+              valueCm: n,
+            ),
+          );
+        }
+        original[k] = n;
+      }
+      if (mounted) Navigator.pop(context, true);
+    } catch (_) {
+      if (mounted)
+        setState(() {
+          saving = false;
+          error = 'Could not save all measurements. Retry to finish saving.';
+        });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final profile = ref.watch(profileRepoProvider).profile;
-    final isImperial = profile.units == 'imperial';
-    final weightUnit = isImperial ? 'lb' : 'kg';
-    final lengthUnit = isImperial ? 'in' : 'cm';
-
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: ListView(
-        shrinkWrap: true,
-        padding: const EdgeInsets.fromLTRB(
-          BloomSpacing.lg,
-          BloomSpacing.sm,
-          BloomSpacing.lg,
-          BloomSpacing.xl,
-        ),
+    final p = ref.watch(profileRepoProvider).profile;
+    final a = ref.watch(avatarRepoProvider).config;
+    return Form(
+      key: form,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Body & Avatar Settings',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+              Expanded(
+                child: Text(
+                  'Your measurements',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
               ),
-              IconButton(
-                icon: const Icon(Icons.close_rounded),
-                onPressed: () => Navigator.of(context).pop(),
+              TextButton(
+                onPressed: saving ? null : () => Navigator.pop(context),
+                child: const Text('Cancel'),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          const InfoNote(
-            icon: Icons.info_outline,
-            text:
-                'Approximate visualization — not a body scan. Values guide a bounded illustrative model and preserve your saved personal health records.',
+          const Text(
+            'Save updates to your records. Optional circumferences refine the illustration; BMI cannot describe body composition.',
           ),
-          const SizedBox(height: BloomSpacing.md),
-
-          // Live Mini 3D Visualizer Preview
-          Container(
-            height: 190,
-            decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFF1E1E24)
-                  : BloomColors.heroPeach.withOpacity(0.50),
-              borderRadius: BorderRadius.circular(BloomRadii.bubble),
-              border: Border.all(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white12
-                    : BloomColors.line,
-                width: 0.8,
-              ),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                HumanVisualizer(
-                  heightCm: double.tryParse(_heightCtrl.text) ?? 170.0,
-                  weightKg: double.tryParse(_weightCtrl.text) ?? 65.0,
-                  stageHeight: 190,
-                  config: AvatarConfig(
-                    frame: _frame,
-                    skinTone: _skinTone,
-                    hairStyle: _hairStyle,
-                    hairColor: _hairColor,
-                    clothingColor: _clothingColor,
-                    facePreset: _facePreset,
-                    clothingStyle: _clothingStyle,
-                  ),
-                ),
-                Positioned(
-                  bottom: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: (Theme.of(context).brightness == Brightness.dark
-                              ? Colors.black
-                              : Colors.white)
-                          .withOpacity(0.70),
-                      borderRadius: BorderRadius.circular(BloomRadii.pill),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.visibility_outlined,
-                          size: 12,
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? Colors.white70
-                              : BloomColors.inkSoft,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Live Avatar Preview',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white70
-                                : BloomColors.inkSoft,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+          HumanVisualizer(
+            stageHeight: 270,
+            heightCm: value('height') ?? p.heightCm ?? 170,
+            weightKg: value('weight') ?? 65,
+            reducedMotion: ref
+                .watch(settingsRepoProvider)
+                .settings
+                .reducedMotion,
+            config: a.copyWith(
+              waistCm: value('waist'),
+              hipCm: value('hips'),
+              chestCm: value('chest'),
             ),
           ),
-          const SizedBox(height: BloomSpacing.md),
-
-          // Primary Metrics (Weight & Height)
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _weightCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: 'Current Weight ($weightUnit)',
-                    hintText: 'e.g. ${isImperial ? "145" : "65"}',
-                    prefixIcon: const Icon(Icons.monitor_weight_outlined),
-                  ),
-                  onChanged: (_) => setState(() {}),
+          for (final k in fields.keys)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: TextFormField(
+                controller: fields[k],
+                enabled: !saving,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
                 ),
+                decoration: InputDecoration(
+                  labelText:
+                      '${k[0].toUpperCase()}${k.substring(1)} (${k == 'weight' ? (imperial ? 'lb' : 'kg') : (imperial ? 'in' : 'cm')})',
+                  helperText: ['waist', 'hips', 'chest'].contains(k)
+                      ? 'Optional • clear to leave the saved record unchanged'
+                      : null,
+                ),
+                onChanged: (_) => setState(() {}),
+                validator: (text) {
+                  if ((text ?? '').trim().isEmpty)
+                    return ['weight', 'height'].contains(k)
+                        ? 'Enter a value'
+                        : null;
+                  final n = value(k);
+                  if (n == null || !n.isFinite || n <= 0)
+                    return 'Enter a positive number';
+                  if (k == 'height' && (n < 80 || n > 250))
+                    return 'Enter height from 80 to 250 cm (or equivalent)';
+                  if (k == 'weight' && (n < 15 || n > 400))
+                    return 'Enter weight from 15 to 400 kg (or equivalent)';
+                  if (!['height', 'weight'].contains(k) && (n < 10 || n > 300))
+                    return 'Enter a circumference from 10 to 300 cm';
+                  return null;
+                },
               ),
-              const SizedBox(width: BloomSpacing.md),
-              Expanded(
-                child: TextField(
-                  controller: _heightCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: 'Height ($lengthUnit)',
-                    hintText: 'e.g. ${isImperial ? "67" : "170"}',
-                    prefixIcon: const Icon(Icons.height_rounded),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: BloomSpacing.md),
-
-          // Optional circumferences
-          Text(
-            'Refining Measurements (Optional)',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _waistCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: 'Waist ($lengthUnit)',
-                    hintText: 'Optional',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: _hipCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: 'Hips ($lengthUnit)',
-                    hintText: 'Optional',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: _chestCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: 'Chest ($lengthUnit)',
-                    hintText: 'Optional',
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: BloomSpacing.lg),
-
-          // Body Frame Selection
-          Text(
-            'Body Frame Width',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 8),
-          SegmentedButton<BodyFrame>(
-            segments: const [
-              ButtonSegment(
-                value: BodyFrame.narrow,
-                label: Text('Narrow'),
-                icon: Icon(Icons.view_column_outlined, size: 16),
-              ),
-              ButtonSegment(
-                value: BodyFrame.medium,
-                label: Text('Medium'),
-                icon: Icon(Icons.grid_view_rounded, size: 16),
-              ),
-              ButtonSegment(
-                value: BodyFrame.broad,
-                label: Text('Broad'),
-                icon: Icon(Icons.table_rows_outlined, size: 16),
-              ),
-            ],
-            selected: {_frame},
-            onSelectionChanged: (set) => setState(() => _frame = set.first),
-          ),
-          const SizedBox(height: BloomSpacing.lg),
-
-          // Facial Profile Presets
-          Text(
-            'Facial Profile',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final preset in FacePreset.values)
-                ChoiceChip(
-                  label: Text(_formatEnum(preset.name)),
-                  selected: _facePreset == preset,
-                  onSelected: (val) {
-                    if (val) setState(() => _facePreset = preset);
-                  },
-                ),
-            ],
-          ),
-          const SizedBox(height: BloomSpacing.lg),
-
-          // Skin Tone Swatches
-          Text(
-            'Skin Tone',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              for (final tone in SkinTone.values)
-                GestureDetector(
-                  onTap: () => setState(() => _skinTone = tone),
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: _skinToneColor(tone),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: _skinTone == tone
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.black12,
-                        width: _skinTone == tone ? 3.0 : 1.2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: _skinTone == tone
-                        ? const Icon(Icons.check, size: 20, color: Colors.white)
-                        : null,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: BloomSpacing.lg),
-
-          // Hairstyle Selection
-          Text(
-            'Hairstyle',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final style in HairStyle.values)
-                ChoiceChip(
-                  label: Text(_formatEnum(style.name)),
-                  selected: _hairStyle == style,
-                  onSelected: (val) {
-                    if (val) setState(() => _hairStyle = style);
-                  },
-                ),
-            ],
-          ),
-          const SizedBox(height: BloomSpacing.md),
-
-          // Hair Color Swatches
-          Text(
-            'Hair Color',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              for (final col in HairColor.values)
-                GestureDetector(
-                  onTap: () => setState(() => _hairColor = col),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: _hairColorColor(col),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: _hairColor == col
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.black12,
-                        width: _hairColor == col ? 3.0 : 1.0,
-                      ),
-                    ),
-                    child: _hairColor == col
-                        ? const Icon(Icons.check, size: 18, color: Colors.white)
-                        : null,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: BloomSpacing.lg),
-
-          // Clothing Style Selection
-          Text(
-            'Clothing Style',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final style in ClothingStyle.values)
-                ChoiceChip(
-                  label: Text(_formatEnum(style.name)),
-                  selected: _clothingStyle == style,
-                  onSelected: (val) {
-                    if (val) setState(() => _clothingStyle = style);
-                  },
-                ),
-            ],
-          ),
-          const SizedBox(height: BloomSpacing.md),
-
-          // Sportswear Color Swatches
-          Text(
-            'Athletic Wear Color',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              for (final col in ClothingColor.values)
-                GestureDetector(
-                  onTap: () => setState(() => _clothingColor = col),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: _clothingColorColor(col),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: _clothingColor == col
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.black12,
-                        width: _clothingColor == col ? 3.0 : 1.0,
-                      ),
-                    ),
-                    child: _clothingColor == col
-                        ? const Icon(Icons.check, size: 18, color: Colors.white)
-                        : null,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: BloomSpacing.xl),
-
-          // Dual Action Buttons: Cancel and Save & Update
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(BloomRadii.pill),
-                    ),
-                  ),
-                  child: const Text('Cancel'),
-                ),
-              ),
-              const SizedBox(width: BloomSpacing.md),
-              Expanded(
-                flex: 2,
-                child: PillButton(
-                  label: 'Save & Update',
-                  icon: Icons.check_circle_outline_rounded,
-                  expanded: true,
-                  onPressed: _save,
-                ),
-              ),
-            ],
+            ),
+          if (error != null)
+            Text(
+              error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          FilledButton(
+            onPressed: saving ? null : save,
+            child: Text(saving ? 'Saving…' : 'Save measurements'),
           ),
         ],
       ),
     );
-  }
-
-  Color _skinToneColor(SkinTone tone) => switch (tone) {
-        SkinTone.fair => const Color(0xFFFBE3D5),
-        SkinTone.warmSand => const Color(0xFFF2D1B3),
-        SkinTone.honey => const Color(0xFFE2B28B),
-        SkinTone.goldenAmber => const Color(0xFFC78B5E),
-        SkinTone.deepBronze => const Color(0xFF945F3B),
-        SkinTone.richEspresso => const Color(0xFF5A3926),
-      };
-
-  Color _hairColorColor(HairColor color) => switch (color) {
-        HairColor.espresso => const Color(0xFF35261E),
-        HairColor.chestnut => const Color(0xFF5D3A29),
-        HairColor.blonde => const Color(0xFFD4B478),
-        HairColor.silver => const Color(0xFFB5BAC0),
-        HairColor.raven => const Color(0xFF18181A),
-      };
-
-  Color _clothingColorColor(ClothingColor color) => switch (color) {
-        ClothingColor.sage => const Color(0xFF6FAF8E),
-        ClothingColor.lavender => const Color(0xFF9B8AC4),
-        ClothingColor.ocean => const Color(0xFF5A94C7),
-        ClothingColor.coral => const Color(0xFFE57B6C),
-        ClothingColor.slate => const Color(0xFF4A5568),
-      };
-
-  String _formatEnum(String name) {
-    // converts camelCase to Title Case
-    final reg = RegExp(r'(?<=[a-z])[A-Z]');
-    final split = name.replaceAllMapped(reg, (m) => ' ${m.group(0)}');
-    return split[0].toUpperCase() + split.substring(1);
   }
 }

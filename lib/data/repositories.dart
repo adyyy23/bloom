@@ -1190,8 +1190,8 @@ class AvatarRepo extends ChangeNotifier {
   }
 
   Future<void> save(AvatarConfig c) async {
-    _config = c;
     await Database.misc.put('avatarConfig', c.toJson());
+    _config = c;
     notifyListeners();
   }
 

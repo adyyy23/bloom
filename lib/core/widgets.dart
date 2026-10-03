@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'theme.dart';
 import 'utils.dart';
 
@@ -102,7 +103,12 @@ class SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, BloomSpacing.lg, 4, BloomSpacing.sm),
+      padding: const EdgeInsets.fromLTRB(
+        4,
+        BloomSpacing.lg,
+        4,
+        BloomSpacing.sm,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -161,7 +167,11 @@ class EmptyState extends StatelessWidget {
               color: Theme.of(context).colorScheme.primary.withOpacity(0.14),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 30, color: Theme.of(context).colorScheme.primary),
+            child: Icon(
+              icon,
+              size: 30,
+              color: Theme.of(context).colorScheme.primary,
+            ),
           ),
           const SizedBox(height: BloomSpacing.md),
           Text(title, style: t.titleMedium, textAlign: TextAlign.center),
@@ -169,7 +179,11 @@ class EmptyState extends StatelessWidget {
           Text(body, style: t.bodySmall, textAlign: TextAlign.center),
           if (actionLabel != null) ...[
             const SizedBox(height: BloomSpacing.md),
-            PillButton(label: actionLabel!, onPressed: onAction, secondary: true),
+            PillButton(
+              label: actionLabel!,
+              onPressed: onAction,
+              secondary: true,
+            ),
           ],
         ],
       ),
@@ -216,8 +230,18 @@ class StatBubble extends StatelessWidget {
             child: Icon(icon, size: 18, color: deep),
           ),
           const SizedBox(height: 8),
-          Text(value, style: t.titleMedium?.copyWith(fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
-          Text(label, style: t.bodySmall?.copyWith(fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+          Text(
+            value,
+            style: t.titleMedium?.copyWith(fontSize: 16),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            label,
+            style: t.bodySmall?.copyWith(fontSize: 12),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 6),
           ClipRRect(
             borderRadius: BorderRadius.circular(99),
@@ -276,15 +300,15 @@ class SegmentedPills<T> extends StatelessWidget {
                     : null,
                 boxShadow: sel ? BloomShadows.soft(context) : null,
               ),
-              alignment: Alignment.center,
+              alignment: hasFiniteWidth ? Alignment.center : null,
               child: Text(
                 labels[i],
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: sel
-                          ? scheme.primary
-                          : Theme.of(context).textTheme.bodySmall?.color,
-                      fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                    ),
+                  color: sel
+                      ? scheme.primary
+                      : Theme.of(context).textTheme.bodySmall?.color,
+                  fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -385,7 +409,10 @@ class TimelineTile extends StatelessWidget {
             Container(
               width: 44,
               height: 44,
-              decoration: BoxDecoration(color: tint, borderRadius: BorderRadius.circular(16)),
+              decoration: BoxDecoration(
+                color: tint,
+                borderRadius: BorderRadius.circular(16),
+              ),
               child: Icon(icon, color: deep, size: 22),
             ),
             const SizedBox(width: 12),
@@ -394,7 +421,12 @@ class TimelineTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title, style: t.titleSmall),
-                  Text(subtitle, style: t.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(
+                    subtitle,
+                    style: t.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
               ),
             ),
@@ -410,7 +442,11 @@ class TimelineTile extends StatelessWidget {
 class InfoNote extends StatelessWidget {
   final String text;
   final IconData icon;
-  const InfoNote({super.key, required this.text, this.icon = Icons.info_outline});
+  const InfoNote({
+    super.key,
+    required this.text,
+    this.icon = Icons.info_outline,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -426,7 +462,9 @@ class InfoNote extends StatelessWidget {
         children: [
           Icon(icon, size: 18, color: scheme.primary),
           const SizedBox(width: 8),
-          Expanded(child: Text(text, style: Theme.of(context).textTheme.bodySmall)),
+          Expanded(
+            child: Text(text, style: Theme.of(context).textTheme.bodySmall),
+          ),
         ],
       ),
     );
@@ -472,7 +510,10 @@ class SettingRow extends StatelessWidget {
             Container(
               width: 42,
               height: 42,
-              decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(15)),
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(15),
+              ),
               child: Icon(icon, color: fg, size: 21),
             ),
             const SizedBox(width: 12),
@@ -483,8 +524,9 @@ class SettingRow extends StatelessWidget {
                   Text(title, style: t.titleSmall),
                   if (subtitleWidget != null)
                     DefaultTextStyle(
-                        style: t.bodySmall!,
-                        child: subtitleWidget!),
+                      style: t.bodySmall!,
+                      child: subtitleWidget!,
+                    ),
                   if (subtitleWidget == null && subtitle != null)
                     Text(subtitle!, style: t.bodySmall),
                 ],
@@ -559,7 +601,9 @@ class MacroBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final total = protein + carbs + fat;
-    final trackColor = dark ? Colors.white.withOpacity(0.08) : BloomColors.surface2;
+    final trackColor = dark
+        ? Colors.white.withOpacity(0.08)
+        : BloomColors.surface2;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -596,8 +640,18 @@ class MacroBar extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _legendItem(context, 'Protein', Fmt.grams(protein), BloomColors.lavenderDeep),
-            _legendItem(context, 'Carbs', Fmt.grams(carbs), BloomColors.peachDeep),
+            _legendItem(
+              context,
+              'Protein',
+              Fmt.grams(protein),
+              BloomColors.lavenderDeep,
+            ),
+            _legendItem(
+              context,
+              'Carbs',
+              Fmt.grams(carbs),
+              BloomColors.peachDeep,
+            ),
             _legendItem(context, 'Fat', Fmt.grams(fat), BloomColors.mintDeep),
           ],
         ),
@@ -605,7 +659,12 @@ class MacroBar extends StatelessWidget {
     );
   }
 
-  Widget _legendItem(BuildContext context, String label, String value, Color c) {
+  Widget _legendItem(
+    BuildContext context,
+    String label,
+    String value,
+    Color c,
+  ) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -621,10 +680,8 @@ class MacroBar extends StatelessWidget {
         ),
         Text(
           value,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-              ),
+          style: Theme.of(context).textTheme.bodySmall
+              ?.copyWith(fontWeight: FontWeight.w700, fontSize: 12),
         ),
       ],
     );
@@ -632,13 +689,19 @@ class MacroBar extends StatelessWidget {
 }
 
 /// Shows a rounded bottom sheet and returns the result.
-Future<T?> showBubbleSheet<T>(BuildContext context, Widget child, {bool scrollable = true}) {
+Future<T?> showBubbleSheet<T>(
+  BuildContext context,
+  Widget child, {
+  bool scrollable = true,
+}) {
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Theme.of(context).colorScheme.surface,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(BloomRadii.sheet)),
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(BloomRadii.sheet),
+      ),
     ),
     builder: (ctx) => SafeArea(
       child: Padding(
@@ -655,15 +718,26 @@ Future<T?> showBubbleSheet<T>(BuildContext context, Widget child, {bool scrollab
 }
 
 /// Confirmation dialog; returns true when confirmed.
-Future<bool> askConfirm(BuildContext context, {required String title, required String body, String confirmLabel = 'Confirm'}) async {
+Future<bool> askConfirm(
+  BuildContext context, {
+  required String title,
+  required String body,
+  String confirmLabel = 'Confirm',
+}) async {
   final res = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text(title),
       content: Text(body, style: Theme.of(ctx).textTheme.bodyMedium),
       actions: [
-        TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-        FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(confirmLabel)),
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: Text(confirmLabel),
+        ),
       ],
     ),
   );
@@ -686,7 +760,11 @@ Future<double?> askNumber(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(title, style: Theme.of(context).textTheme.titleLarge, textAlign: TextAlign.center),
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleLarge,
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: BloomSpacing.md),
         TextField(
           controller: ctrl,
@@ -704,7 +782,11 @@ Future<double?> askNumber(
             final v = double.tryParse(ctrl.text.trim());
             if (v == null || v < min || (max != null && v > max)) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Enter a value between $min and ${max ?? '∞'} $unit')),
+                SnackBar(
+                  content: Text(
+                    'Enter a value between $min and ${max ?? '∞'} $unit',
+                  ),
+                ),
               );
               return;
             }
@@ -733,9 +815,7 @@ class ClayDumbbellIllustration extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: CustomPaint(
-        painter: _ClayDumbbellPainter(baseColor: baseColor),
-      ),
+      child: CustomPaint(painter: _ClayDumbbellPainter(baseColor: baseColor)),
     );
   }
 }
@@ -755,7 +835,11 @@ class _ClayDumbbellPainter extends CustomPainter {
       ..color = Colors.black.withOpacity(0.12)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
     canvas.drawOval(
-      Rect.fromCenter(center: Offset(center.dx, h * 0.88), width: w * 0.72, height: h * 0.22),
+      Rect.fromCenter(
+        center: Offset(center.dx, h * 0.88),
+        width: w * 0.72,
+        height: h * 0.22,
+      ),
       shadowPaint,
     );
 
@@ -794,7 +878,11 @@ class _ClayDumbbellPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
     for (var gx = -w * 0.14; gx <= w * 0.14; gx += w * 0.07) {
-      canvas.drawLine(Offset(gx, -shaftRadius), Offset(gx, shaftRadius), gripPaint);
+      canvas.drawLine(
+        Offset(gx, -shaftRadius),
+        Offset(gx, shaftRadius),
+        gripPaint,
+      );
     }
 
     // 3. Weight plates (left and right)
@@ -841,7 +929,10 @@ class _ClayDumbbellPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.2;
       canvas.drawRRect(
-        RRect.fromRectAndRadius(plateRect.deflate(1.2), Radius.circular(radiusX * 0.45)),
+        RRect.fromRectAndRadius(
+          plateRect.deflate(1.2),
+          Radius.circular(radiusX * 0.45),
+        ),
         bevelPaint,
       );
     }
@@ -876,9 +967,7 @@ class ClaySneakerIllustration extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: CustomPaint(
-        painter: _ClaySneakerPainter(upperColor: upperColor),
-      ),
+      child: CustomPaint(painter: _ClaySneakerPainter(upperColor: upperColor)),
     );
   }
 }
@@ -908,10 +997,38 @@ class _ClaySneakerPainter extends CustomPainter {
     // 2. Thick sculpted clay sole
     final solePath = Path();
     solePath.moveTo(w * 0.12, h * 0.72);
-    solePath.cubicTo(w * 0.28, h * 0.70, w * 0.65, h * 0.68, w * 0.90, h * 0.62);
-    solePath.cubicTo(w * 0.96, h * 0.64, w * 0.95, h * 0.78, w * 0.88, h * 0.82);
-    solePath.cubicTo(w * 0.65, h * 0.85, w * 0.32, h * 0.85, w * 0.14, h * 0.83);
-    solePath.cubicTo(w * 0.08, h * 0.81, w * 0.07, h * 0.74, w * 0.12, h * 0.72);
+    solePath.cubicTo(
+      w * 0.28,
+      h * 0.70,
+      w * 0.65,
+      h * 0.68,
+      w * 0.90,
+      h * 0.62,
+    );
+    solePath.cubicTo(
+      w * 0.96,
+      h * 0.64,
+      w * 0.95,
+      h * 0.78,
+      w * 0.88,
+      h * 0.82,
+    );
+    solePath.cubicTo(
+      w * 0.65,
+      h * 0.85,
+      w * 0.32,
+      h * 0.85,
+      w * 0.14,
+      h * 0.83,
+    );
+    solePath.cubicTo(
+      w * 0.08,
+      h * 0.81,
+      w * 0.07,
+      h * 0.74,
+      w * 0.12,
+      h * 0.72,
+    );
     solePath.close();
 
     final soleRect = Rect.fromLTWH(0, h * 0.6, w, h * 0.3);
@@ -919,11 +1036,7 @@ class _ClaySneakerPainter extends CustomPainter {
       ..shader = const LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [
-          Colors.white,
-          Color(0xFFF1F4F9),
-          Color(0xFFD6DBE5),
-        ],
+        colors: [Colors.white, Color(0xFFF1F4F9), Color(0xFFD6DBE5)],
       ).createShader(soleRect);
     canvas.drawPath(solePath, solePaint);
 
@@ -933,16 +1046,48 @@ class _ClaySneakerPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
     for (var tx = w * 0.22; tx <= w * 0.82; tx += w * 0.1) {
-      canvas.drawLine(Offset(tx, h * 0.75), Offset(tx + w * 0.03, h * 0.83), treadPaint);
+      canvas.drawLine(
+        Offset(tx, h * 0.75),
+        Offset(tx + w * 0.03, h * 0.83),
+        treadPaint,
+      );
     }
 
     // 3. Shoe upper body
     final upperPath = Path();
     upperPath.moveTo(w * 0.16, h * 0.71);
-    upperPath.cubicTo(w * 0.14, h * 0.52, w * 0.24, h * 0.42, w * 0.35, h * 0.40); // Heel & collar
-    upperPath.cubicTo(w * 0.44, h * 0.48, w * 0.50, h * 0.52, w * 0.58, h * 0.52); // Ankle dip
-    upperPath.cubicTo(w * 0.68, h * 0.45, w * 0.76, h * 0.52, w * 0.88, h * 0.62); // Toe box
-    upperPath.cubicTo(w * 0.70, h * 0.67, w * 0.40, h * 0.69, w * 0.16, h * 0.71); // Bottom junction
+    upperPath.cubicTo(
+      w * 0.14,
+      h * 0.52,
+      w * 0.24,
+      h * 0.42,
+      w * 0.35,
+      h * 0.40,
+    ); // Heel & collar
+    upperPath.cubicTo(
+      w * 0.44,
+      h * 0.48,
+      w * 0.50,
+      h * 0.52,
+      w * 0.58,
+      h * 0.52,
+    ); // Ankle dip
+    upperPath.cubicTo(
+      w * 0.68,
+      h * 0.45,
+      w * 0.76,
+      h * 0.52,
+      w * 0.88,
+      h * 0.62,
+    ); // Toe box
+    upperPath.cubicTo(
+      w * 0.70,
+      h * 0.67,
+      w * 0.40,
+      h * 0.69,
+      w * 0.16,
+      h * 0.71,
+    ); // Bottom junction
     upperPath.close();
 
     final upperRect = Rect.fromLTWH(w * 0.1, h * 0.35, w * 0.8, h * 0.4);
@@ -961,8 +1106,22 @@ class _ClaySneakerPainter extends CustomPainter {
     // 4. Heel counter accent overlay
     final heelPath = Path();
     heelPath.moveTo(w * 0.16, h * 0.71);
-    heelPath.cubicTo(w * 0.14, h * 0.52, w * 0.24, h * 0.42, w * 0.32, h * 0.41);
-    heelPath.cubicTo(w * 0.30, h * 0.56, w * 0.26, h * 0.68, w * 0.25, h * 0.71);
+    heelPath.cubicTo(
+      w * 0.14,
+      h * 0.52,
+      w * 0.24,
+      h * 0.42,
+      w * 0.32,
+      h * 0.41,
+    );
+    heelPath.cubicTo(
+      w * 0.30,
+      h * 0.56,
+      w * 0.26,
+      h * 0.68,
+      w * 0.25,
+      h * 0.71,
+    );
     heelPath.close();
 
     final heelPaint = Paint()
@@ -983,9 +1142,21 @@ class _ClaySneakerPainter extends CustomPainter {
       ..strokeWidth = 2.5
       ..strokeCap = StrokeCap.round;
 
-    canvas.drawLine(Offset(w * 0.52, h * 0.48), Offset(w * 0.62, h * 0.53), lacePaint);
-    canvas.drawLine(Offset(w * 0.58, h * 0.45), Offset(w * 0.68, h * 0.50), lacePaint);
-    canvas.drawLine(Offset(w * 0.64, h * 0.42), Offset(w * 0.73, h * 0.48), lacePaint);
+    canvas.drawLine(
+      Offset(w * 0.52, h * 0.48),
+      Offset(w * 0.62, h * 0.53),
+      lacePaint,
+    );
+    canvas.drawLine(
+      Offset(w * 0.58, h * 0.45),
+      Offset(w * 0.68, h * 0.50),
+      lacePaint,
+    );
+    canvas.drawLine(
+      Offset(w * 0.64, h * 0.42),
+      Offset(w * 0.73, h * 0.48),
+      lacePaint,
+    );
 
     // 6. Specular catchlight on toe
     final catchPaint = Paint()

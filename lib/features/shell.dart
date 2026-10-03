@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../core/theme.dart';
 import '../data/repositories.dart';
 import 'today.dart';
@@ -50,7 +51,13 @@ class _ShellState extends ConsumerState<Shell> {
     return Scaffold(
       body: Stack(
         children: [
-          IndexedStack(index: _index, children: pages),
+          IndexedStack(
+            index: _index,
+            children: [
+              for (var i = 0; i < pages.length; i++)
+                TickerMode(enabled: i == _index, child: pages[i]),
+            ],
+          ),
           if (settings.companionVisible && _index != 0)
             Positioned(
               right: 18,
@@ -76,7 +83,8 @@ class _ShellState extends ConsumerState<Shell> {
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(
-                  Theme.of(context).brightness == Brightness.dark ? 0.3 : 0.06),
+                Theme.of(context).brightness == Brightness.dark ? 0.3 : 0.06,
+              ),
               blurRadius: 16,
               offset: const Offset(0, 4),
             ),
@@ -108,9 +116,8 @@ class _ShellState extends ConsumerState<Shell> {
   }
 
   void _openChat(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ChatScreen()),
-    );
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const ChatScreen()));
   }
 }
 

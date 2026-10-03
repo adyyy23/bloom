@@ -260,31 +260,31 @@ void main() {
   group('BMI & Clinical Classification', () {
     test('standard adult WHO/CDC categories', () {
       // Underweight (< 18.5)
-      final under = Calc.calculateBmi(weightKg: 45, heightCm: 165);
+      final under = Calc.calculateBmi(weightKg: 45, heightCm: 165, birthYear: 1990);
       expect(under, isNotNull);
       expect(under!.category, 'Underweight');
       expect(under.isApplicable, true);
 
       // Normal weight (18.5 - 24.9)
-      final normal = Calc.calculateBmi(weightKg: 60, heightCm: 165);
+      final normal = Calc.calculateBmi(weightKg: 60, heightCm: 165, birthYear: 1990);
       expect(normal, isNotNull);
-      expect(normal!.category, 'Normal weight');
+      expect(normal!.category, 'Standard range');
       expect(normal.isApplicable, true);
 
       // Overweight (25.0 - 29.9)
-      final over = Calc.calculateBmi(weightKg: 75, heightCm: 165);
+      final over = Calc.calculateBmi(weightKg: 75, heightCm: 165, birthYear: 1990);
       expect(over, isNotNull);
       expect(over!.category, 'Overweight');
       expect(over.isApplicable, true);
 
       // Obesity (>= 30.0)
-      final obese = Calc.calculateBmi(weightKg: 90, heightCm: 165);
+      final obese = Calc.calculateBmi(weightKg: 90, heightCm: 165, birthYear: 1990);
       expect(obese, isNotNull);
       expect(obese!.category, 'Obesity');
       expect(obese.isApplicable, true);
     });
 
-    test('clinical guard: minor age (<18) is marked not applicable', () {
+    test('clinical guard: minor age (<20) is marked not applicable', () {
       final currentYear = DateTime.now().year;
       final minor = Calc.calculateBmi(
         weightKg: 50,
@@ -293,7 +293,7 @@ void main() {
       );
       expect(minor, isNotNull);
       expect(minor!.isApplicable, false);
-      expect(minor.category, contains('18'));
+      expect(minor.category, contains('20'));
     });
 
     test('clinical guard: pregnancy/nursing is marked not applicable', () {
