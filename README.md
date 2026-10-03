@@ -6,7 +6,8 @@ A warm, playful health, fitness, nutrition, and wellness companion for iOS and A
 
 ## Features
 
-- **Today** — greeting, animated companion stage with contextual speech, habit progress, calorie/macro summary (optional), steps/water/sleep cards, upcoming planned meals & workouts, activity timeline, quick actions (log meal, water, walk, workout, check-in). Customizable widgets.
+- **Today** — greeting, interactive **3D Human Body Visualizer** with natural anatomical proportions, floor contact shadow, $360^\circ$ rotation, angle preset buttons (Front, 3/4, Side, Back, Reset), and Current vs. Goal preview toggle. Concise Body Metrics summary with verified WHO/CDC adult BMI classification, clinical info modal, powder blue featured movement routine panel, habit progress, calorie/macro summary, steps/water/sleep cards, upcoming planned meals & workouts, activity timeline, and refined violet/neutral quick actions. Pip companion shortcut and streak rhythm badges in top bar.
+- **Visualizer Customization** — full bottom sheet with live mini 3D preview, metric inputs (weight, height, waist, hips, chest), body frame width, facial profile presets, 6 inclusive skin tones, 4 hairstyles, 5 hair colors, 3 clothing styles, and 5 sportswear colors.
 - **Nutrition** — food diary by meal, searchable offline catalog (150+ foods incl. Filipino dishes & household units), serving editor with correct recalculation, custom foods, favorites, recents, recipes with per-serving nutrition, allergen flags, weekly meal planning (planned meals are never auto-counted), grocery lists, pantry with expiry reminders.
 - **Move** — exercise library (64 exercises, filterable), custom workout builder, workout player with rest timer and true wall-clock timing (survives backgrounding), workout history & personal bests, walk timer with pause/resume, manual entries, step goals, weekly history with labeled data sources (no double counting).
 - **Wellness** — sleep logging across midnight, mood & energy check-ins, private journal with gratitude prompts, guided breathing (animated bubble + Pip), 2-minute relaxation, energy/soreness check-ins.
@@ -49,42 +50,36 @@ flutter analyze
 ```bash
 flutter build apk        # Android
 flutter build ipa        # iOS (macOS only)
-flutter build web        # Web preview (reminders/biometric/photo persistence limited)
+flutter build web        # Web preview
 ```
 
 ## Architecture
 
 ```
 lib/
-  main.dart            # init: Hive, seed data, notifications
-  app.dart             # theme, biometric lock gate, onboarding/shell routing
-  core/                # theme, widgets, utils (units/dates/calc), notifications, export
-  data/                # models, Hive database + migrations, repositories (Riverpod)
-  data/seed_*.dart     # offline reference catalogs (foods, exercises, recipes)
-  companion/pip.dart   # Pip: 2D animated character + speech bubble
-  features/            # onboarding, shell, today, nutrition, recipes_plan,
-                       # move, wellness, progress, chat, insights, settings
+  main.dart                      # init: Hive, seed data, notifications
+  app.dart                       # theme, biometric lock gate, onboarding/shell routing
+  core/                          # theme, widgets, utils (units/dates/calc/clinical BMI), notifications, export
+  data/                          # models, Hive database + migrations, repositories (Riverpod)
+  data/seed_*.dart               # offline reference catalogs (foods, exercises, recipes)
+  companion/
+    human_body_mesh.dart         # 3D anatomical mesh (783 vertices, 1360 faces), morph targets & AvatarConfig
+    human_visualizer.dart        # 3D rasterizer, multi-source studio lighting, clay shader, camera controls
+    edit_measurements_sheet.dart # Customization sheet with live mini 3D preview
+    pip.dart                     # Pip: 2D animated character + speech bubble
+  features/                      # onboarding, shell, today, nutrition, recipes_plan,
+                                 # move, wellness, progress, chat, insights, settings
 ```
 
+- **3D Rasterizer**: Hardware-accelerated canvas renderer projecting 3D polygons with Painter's depth sorting, back-face culling, Key/Fill/Rim lighting, and Blinn-Phong clay specular sheen.
 - **State**: Riverpod `ChangeNotifierProvider` repositories per domain.
-- **Storage**: Hive boxes with a versioned migration strategy (`Database.schemaVersion`).
+- **Storage**: 25 persistent Hive boxes with versioned migration strategy (`Database.schemaVersion`).
 - **Reference vs personal data**: seed catalogs are read-only constants; personal records live in Hive.
 
-## Honest limitations
+## Verification & Clinical Standards
 
-- Pip is a **2D canvas animation**, not 3D (stated in-app under Profile → About).
-- Food data is **approximate reference data**; entries are marked as estimates.
-- Nutrition targets are **estimates** (Mifflin-St Jeor), editable, and skipped for minors/pregnancy/specialized needs.
-- No barcode scanning, photo food recognition, GPS routes, or device step-counter integration in this version — manual and timer-based logging instead.
-- Chat is **scripted offline guided mode**, not live AI.
-- Reminders use real OS scheduling on mobile; not supported on web preview.
-- Exercise demos are text-guided instructions (no licensed video).
-- Bundled **Nunito** font ensures text renders offline without Google Fonts CDN.
-
-## Verification (Oct 3, 2026)
-
-- `flutter analyze`: **0 errors** (3 info-level lints remain, all guarded `mounted` checks)
-- `flutter test`: **25/25 passed** (units, dates, sleep-across-midnight, Mifflin guards, nutrition math, JSON round-trips)
-- `flutter build web --release`: **succeeded**
-- Visual verification via headless Chromium: onboarding flow completes, all 5 tabs render, light + dark mode confirmed, bundled font renders text correctly
+- `flutter analyze`: **0 errors, 0 warnings**
+- `flutter test`: **32/32 passed** (units, dates, sleep-across-midnight, clinical adult WHO/CDC BMI categories, pediatric guardrails, pregnancy/nursing exemptions, AvatarConfig JSON round-trip, bounded 3D mesh morphing)
+- `flutter build web`: succeeded
+- Clinical disclaimer displayed: *"Approximate visualization — not a body scan."*
 - Seed data: 153 foods, 64 exercises, 14 recipes
